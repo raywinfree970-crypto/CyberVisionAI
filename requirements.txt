@@ -157,3 +157,6 @@ vine==5.1.0
 watchdog==6.0.0
 wcwidth==0.2.13
 zope.interface==7.2
+pywebview==4.0
+requests==2.32.3
+pyinstaller==5.10.1

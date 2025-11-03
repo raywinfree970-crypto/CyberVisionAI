@@ -167,6 +167,70 @@ If you wish to use the Retrieval-Augmented Generation (RAG) feature, you will ne
 
 ---
 
+## Quick Desktop Launcher (Windows)
+
+You can start the app like a normal desktop app on Windows. From the project root there is a small helper script that opens separate PowerShell windows for the Django server and Celery worker and opens your browser.
+
+1. Make sure the virtual environment `venv` exists and is created as described above.
+2. From an elevated PowerShell run once to create a desktop shortcut:
+
+```powershell
+cd path\to\CyberVisionAI\scripts
+.\create_desktop_shortcut.ps1
+```
+
+3. Double-click the `CyberVisionAI` shortcut on your Desktop. It will:
+  - Open a PowerShell window running the Django server
+  - Open a PowerShell window running the Celery worker
+  - Open your default browser at http://localhost:8000
+
+If you prefer to run manually, use:
+
+```powershell
+cd path\to\CyberVisionAI
+.\scripts\start_app.ps1
+```
+
+Note: The scripts assume `venv` is in the project root and PowerShell execution policy allows running scripts. If blocked, run PowerShell as Administrator and allow execution for the current session:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+## Voice AI Chat
+
+A lightweight voice-enabled chat page is available at `/chat/voice/` after you log in. It uses your browser's Web Speech API for speech-to-text and text-to-speech and sends prompts to the backend AI endpoint.
+
+- Speak into your microphone, the page will transcribe and send the prompt to the AI.
+- The assistant's reply will be shown and read aloud using your browser's TTS.
+
+If you want to customize the backend AI model used, the endpoint `POST /chat/api/ai_chat/` accepts JSON `{ "prompt": "...", "model": "X" }` and returns `{ "response": "..." }`.
+
+## Build a single-executable Desktop App (Windows)
+
+If you want a single-folder or single-exe to distribute locally, you can bundle the small desktop launcher with PyInstaller. This script will start Django and show an embedded window using `pywebview`.
+
+1. Install build dependencies in your activated venv:
+
+```powershell
+pip install pywebview requests pyinstaller
+```
+
+2. From the project root run the helper build script:
+
+```powershell
+cd scripts
+.\build_exe.ps1
+```
+
+3. After the build completes, you'll find a `dist\CyberVisionAI_Desktop` folder. Copy the entire folder to the target machine. The Django project files (templates, static, media) should remain in their relative locations to the exe so the server can serve them.
+
+Notes:
+- I recommend using `--onedir` (the provided script) rather than `--onefile` because Django needs template/static files available on disk. If you want a true single-file bundle, you'll need additional packaging work to embed templates and static assets inside the executable, which is more complex.
+- The resulting EXE runs the development server and is intended for local/offline use only.
+
+
+
 ## Configuration and Customization
 
 - [`project/settings.py`](./project/settings.py): Main Django configuration. Here you can adjust the database, Redis broker URL for Celery, and other backend settings.
@@ -186,3 +250,58 @@ If you wish to use the Retrieval-Augmented Generation (RAG) feature, you will ne
 ## License
 
 This project is licensed under the [MIT License](https://github.com/bx0-0/CyberVisionAI/blob/main/LICENSE).
+
+---
+
+## Troubleshooting (Redis, Celery & PyWebView on Windows)
+
+- Redis not running / Celery can't connect:
+  - On Windows it's easiest to run Redis via Docker:
+    - Install Docker Desktop, then the provided `scripts\start_app.ps1` will attempt to start a Redis container named `cybervision_redis` automatically.
+    - If you prefer WSL, install Redis inside your WSL distribution and run `redis-server` there.
+  - If you can't run Redis, you can run Celery in a local-development mode by using the `--pool=solo` option (already used in our scripts) and avoid task dispatching that requires a broker. However, many async background tasks will not work without a broker.
+
+- PyWebView / PyInstaller / pythonnet build errors when building the desktop EXE:
+  - Building a Windows executable that imports `pywebview` can trigger the compilation of `pythonnet` on some systems, which requires MSBuild and .NET toolchain (and can fail during pip builds).
+  - Workarounds:
+    - Build on a machine with Visual Studio Build Tools (MSBuild) installed.
+    - Use the provided `scripts\build_exe.ps1` but be prepared to install additional build tools if errors reference MSBuild or NuGet packages.
+    - If you only need a local desktop launcher for development, install `pywebview` into your venv (`pip install pywebview requests`) and use `python desktop_app.py` instead of building an EXE.
+    - If packaging continued to fail, consider distributing the `scripts\desktop_app.py` script and a small launcher that runs the project with an existing Python environment instead of a single exe.
+
+If you want, I can:
+
+- Walk you through installing Redis (Docker or WSL) and test Celery connectivity.
+- Attempt a local build of the desktop EXE and iterate on any build failures (I can add helper scripts to gather full build logs and handle common MSBuild issues).
+
+## USB hardware unlock (developer convenience)
+
+You can provision a USB stick to act as a local unlock key for your project. This is a developer convenience mechanism (not a replacement for proper hardware security modules) and works offline.
+
+Files added:
+- `scripts/provision_usb.py` — create an encrypted file `cybervision_unlock.bin` on the USB root. Keep the password safe.
+- `scripts/check_usb.py` — verify and decrypt the file using the password and print the unlock token.
+- `scripts/usb_unlock.ps1` — interactive PowerShell wrapper for Windows which runs the check and stores the token to `.cybervision_unlock_token` in the repo root.
+
+Quick usage (Windows PowerShell):
+
+1. Provision a USB drive (run once):
+
+```powershell
+# from project root
+python .\scripts\provision_usb.py --drive D: --password "YourStrongPassword"
+```
+
+2. Unlock (on any machine with the USB inserted):
+
+```powershell
+.\scripts\usb_unlock.ps1
+# follow prompts for drive letter and password
+```
+
+The PowerShell helper writes the decrypted token to `.cybervision_unlock_token` in the repo root — other scripts can read that file to confirm the unlock state.
+
+Security notes:
+- The token is stored encrypted on the USB and protected by the password you choose. Keep the USB and password safe.
+- This is intended for local developer convenience. For production-grade hardware-based keys consider using a YubiKey, a TPM-backed HSM, or platform-specific APIs.
+

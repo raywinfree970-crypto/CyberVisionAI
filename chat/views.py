@@ -19,6 +19,14 @@ from django.conf import settings
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.http import StreamingHttpResponse
+from django.views.decorators.http import require_POST
+from django.views.decorators.cache import never_cache
+from django.contrib.auth.decorators import login_required
+
+try:
+    from genReport.toolkit import get_assistant_response
+except Exception:
+    get_assistant_response = None
 
 # Create your views here.
 
@@ -237,3 +245,45 @@ def search_LLm(request):
 
 def search_page(request):
     return render(request, 'search_pro.html')
+
+
+@login_required
+def voice_chat_page(request):
+    """Render the voice-enabled chat page."""
+    return render(request, 'chat/voice_chat.html')
+
+
+@login_required
+@require_POST
+@never_cache
+def ai_chat_api(request):
+    """Simple API endpoint to return AI assistant response for a prompt.
+
+    Expects JSON: {"prompt": "...", "model": "X", "character": "..."}
+    Returns: {"response": "..."}
+    """
+    try:
+        data = json.loads(request.body)
+    except Exception:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    prompt = data.get('prompt', '').strip()
+    model = data.get('model', 'X')
+    character = data.get('character', '')
+
+    if not prompt:
+        return JsonResponse({'error': 'Prompt is required'}, status=400)
+
+    # Use genReport toolkit if available
+    if get_assistant_response:
+        try:
+            # Reuse existing report toolkit to generate a reply. We pass the prompt as bug_info and a minimal structure.
+            report_structure = '<o>{answer}</o>'
+            reply = get_assistant_response(prompt, report_structure, model=model, character=character)
+        except Exception as e:
+            reply = f"Error generating response: {str(e)}"
+    else:
+        # Fallback: echo back
+        reply = f"(local fallback) I received: {prompt}"
+
+    return JsonResponse({'response': reply})

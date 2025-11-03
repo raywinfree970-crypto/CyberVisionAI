@@ -1,5 +1,18 @@
 from django.urls import path
-from .views import streamlit_view,send_api,save_chat,get_conversation,list_conversations,delete_conversation,create_mind_map,mind_map_view,search_page,search_LLm
+from .views import (
+    streamlit_view,
+    send_api,
+    save_chat,
+    get_conversation,
+    list_conversations,
+    delete_conversation,
+    create_mind_map,
+    mind_map_view,
+    search_page,
+    search_LLm,
+    voice_chat_page,
+    ai_chat_api,
+)
 
 app_name='chat'
 urlpatterns = [
@@ -13,6 +26,8 @@ urlpatterns = [
     path('delete_conversation/<slug>/', delete_conversation, name='delete_conversation'),
     path('researcher/', search_LLm, name='researcher_LLm'),
     path('search/', search_page, name='search_page'),
+    path('voice/', voice_chat_page, name='voice_chat'),
+    path('api/ai_chat/', ai_chat_api, name='ai_chat_api'),
 
 ]
 
